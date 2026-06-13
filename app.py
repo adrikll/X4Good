@@ -2,6 +2,8 @@ import streamlit as st
 import database
 import components
 
+st.write(st.secrets)
+
 st.set_page_config(page_title="X4Good Administrator Suite", layout="wide", page_icon="🌐")
 
 st.title("🌐 X4Good Social Media")
@@ -12,11 +14,21 @@ if "connected" not in st.session_state:
 
 # 2. TENTATIVA DE LEITURA AUTOMÁTICA DOS SECRETS (NUVEM OU LOCAL)
 try:
+
     uri = st.secrets["NEO4J_URI"]
-    user = st.secrets["NEO4J_USER"]
+
+    user = st.secrets["NEO4J_USERNAME"]
+
     password = st.secrets["NEO4J_PASSWORD"]
+
+    database_name = st.secrets["NEO4J_DATABASE"]
+
     usando_secrets = True
-except KeyError:
+
+except Exception as e:
+
+    st.write(e)
+
     usando_secrets = False
 
 # --- CONFIGURAÇÃO DE LOGIN LATERAL ---
