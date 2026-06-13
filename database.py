@@ -17,6 +17,7 @@ def test_connection(uri, auth_user, auth_pass):
 def run_cypher(uri, user, password, query, parameters=None):
     try:
         driver = get_neo4j_driver(uri, user, password)
+        # Deixamos o session() vazio para o Aura usar o banco padrão automaticamente
         with driver.session() as session:
             result = session.run(query, parameters)
             return list(result)
