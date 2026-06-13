@@ -6,24 +6,50 @@ st.set_page_config(page_title="X4Good Administrator Suite", layout="wide", page_
 
 st.title("🌐 X4Good Social Media")
 
+# 1. INICIALIZA O ESTADO DE CONEXÃO
 if "connected" not in st.session_state:
     st.session_state.connected = False
 
+# 2. TENTATIVA DE LEITURA AUTOMÁTICA DOS SECRETS (NUVEM OU LOCAL)
+try:
+    uri = st.secrets["NEO4J_URI"]
+    user = st.secrets["NEO4J_USER"]
+    password = st.secrets["NEO4J_PASSWORD"]
+    usando_secrets = True
+except KeyError:
+    usando_secrets = False
+
 # --- CONFIGURAÇÃO DE LOGIN LATERAL ---
 st.sidebar.header("Autenticação Neo4j")
-uri = st.sidebar.text_input("URI de Conexão", value="bolt://localhost:7687")
-user = st.sidebar.text_input("Usuário", value="neo4j")
-password = st.sidebar.text_input("Senha", type="password", value="")
 
-if st.sidebar.button("Conectar ao Banco de Dados"):
-    if database.test_connection(uri, user, password):
-        st.session_state.connected = True
-        st.sidebar.success("Conexão estabelecida!")
-    else:
-        st.session_state.connected = False
+if usando_secrets:
+    st.sidebar.success("🔒 Conectado via Streamlit Secrets!")
+    st.sidebar.info("As credenciais seguras da nuvem do Neo4j Aura estão ativas.")
+    
+    # Executa o teste de conexão automático apenas uma vez para não travar o app
+    if not st.session_state.connected:
+        with st.spinner("Sincronizando com o Neo4j Aura..."):
+            if database.test_connection(uri, user, password):
+                st.session_state.connected = True
+            else:
+                st.sidebar.error("Falha ao autenticar com as credenciais dos Secrets.")
+else:
+    # MODO DE CONTINGÊNCIA: Se não achar os Secrets, mostra o formulário original (Localhost)
+    st.sidebar.warning("⚠️ Modo Local: Secrets não detectados.")
+    uri = st.sidebar.text_input("URI de Conexão", value="bolt://localhost:7687")
+    user = st.sidebar.text_input("Usuário", value="neo4j")
+    password = st.sidebar.text_input("Senha", type="password", value="")
+
+    if st.sidebar.button("Conectar ao Banco de Dados"):
+        if database.test_connection(uri, user, password):
+            st.session_state.connected = True
+            st.sidebar.success("Conexão estabelecida localmente!")
+        else:
+            st.session_state.connected = False
 
 st.markdown("---")
 
+# 3. RENDERIZAÇÃO DO ECOSSISTEMA (Permanece com a sua lógica original)
 if not st.session_state.connected:
     st.info("Autentique-se utilizando o painel lateral esquerdo para ativar as caixas do ecossistema.")
 else:
