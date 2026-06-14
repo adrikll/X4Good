@@ -2,8 +2,6 @@ import streamlit as st
 import database
 import components
 
-st.write(st.secrets)
-
 st.set_page_config(page_title="X4Good Administrator Suite", layout="wide", page_icon="🌐")
 
 st.title("🌐 X4Good Social Media")
