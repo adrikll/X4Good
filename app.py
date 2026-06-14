@@ -2,27 +2,19 @@ import streamlit as st
 import database
 import components
 
-st.write(st.secrets)
-
 st.set_page_config(page_title="X4Good Administrator Suite", layout="wide", page_icon="🌐")
 
 st.title("🌐 X4Good Social Media")
 
-# 1. INICIALIZA O ESTADO DE CONEXÃO
 if "connected" not in st.session_state:
     st.session_state.connected = False
 
-# 2. TENTATIVA DE LEITURA AUTOMÁTICA DOS SECRETS (NUVEM OU LOCAL)
 try:
-
+    #conexão local
     uri = st.secrets["NEO4J_URI"]
-
     user = st.secrets["NEO4J_USERNAME"]
-
     password = st.secrets["NEO4J_PASSWORD"]
-
     database_name = st.secrets["NEO4J_DATABASE"]
-
     usando_secrets = True
 
 except Exception as e:
@@ -31,7 +23,6 @@ except Exception as e:
 
     usando_secrets = False
 
-# --- CONFIGURAÇÃO DE LOGIN LATERAL ---
 st.sidebar.header("Autenticação Neo4j")
 
 if usando_secrets:
@@ -41,33 +32,32 @@ if usando_secrets:
     # Executa o teste de conexão automático apenas uma vez para não travar o app
     if not st.session_state.connected:
         with st.spinner("Sincronizando com o Neo4j Aura..."):
-            if database.test_connection(uri, user, password):
+            if database.test_connection(uri, user, password, silent=True):
                 st.session_state.connected = True
+                st.rerun()
             else:
                 st.sidebar.error("Falha ao autenticar com as credenciais dos Secrets.")
 else:
-    # MODO DE CONTINGÊNCIA: Se não achar os Secrets, mostra o formulário original (Localhost)
+
     st.sidebar.warning("⚠️ Modo Local: Secrets não detectados.")
     uri = st.sidebar.text_input("URI de Conexão", value="bolt://localhost:7687")
     user = st.sidebar.text_input("Usuário", value="neo4j")
     password = st.sidebar.text_input("Senha", type="password", value="")
 
     if st.sidebar.button("Conectar ao Banco de Dados"):
-        if database.test_connection(uri, user, password):
+        if database.test_connection(uri, user, password, silent=False):
             st.session_state.connected = True
             st.sidebar.success("Conexão estabelecida localmente!")
+            st.rerun()
         else:
             st.session_state.connected = False
 
 st.markdown("---")
 
-# 3. RENDERIZAÇÃO DO ECOSSISTEMA (Permanece com a sua lógica original)
 if not st.session_state.connected:
     st.info("Autentique-se utilizando o painel lateral esquerdo para ativar as caixas do ecossistema.")
 else:
-    # ----------------------------------------------------
-    # BLOCO SUPERIOR
-    # ----------------------------------------------------
+    
     col_top_left, col_top_right = st.columns([1.0, 1.0])
     
     with col_top_left:
@@ -92,9 +82,6 @@ else:
 
     st.markdown("---")
     
-    # ----------------------------------------------------
-    # BLOCO INFERIOR
-    # ----------------------------------------------------
     col_bottom_left, col_bottom_right = st.columns([1.0, 1.0])
     
     with col_bottom_left:
