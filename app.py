@@ -26,7 +26,7 @@ except Exception as e:
 st.sidebar.header("Autenticação Neo4j")
 
 if usando_secrets:
-    st.sidebar.success("🔒 Conectado via Streamlit Secrets!")
+    st.sidebar.success("Conectado via Streamlit Secrets!")
     st.sidebar.info("As credenciais seguras da nuvem do Neo4j Aura estão ativas.")
     
     # Executa o teste de conexão automático apenas uma vez para não travar o app
@@ -77,7 +77,7 @@ else:
                 with st.spinner("Processando instrução..."):
                     resultado = database.run_cypher(uri, user, password, cypher_prompt)
                     if resultado is not None:
-                        st.write("📊 Registros Retornados:")
+                        st.write(" Registros Retornados:")
                         st.json([record.data() for record in resultado])
 
     st.markdown("---")
