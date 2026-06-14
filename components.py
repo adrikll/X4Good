@@ -1,8 +1,9 @@
 import streamlit as st
-from pyvis.network import Network
+import streamlit.components.v1 as components
 import database
-import base64
 from datetime import datetime
+
+from neo4j_viz import Node as VizNode, Relationship as VizRel, VisualizationGraph
 
 # Mapeamento de cores únicas por Tipo de Entidade (Nós)
 NODE_COLORS = {
@@ -21,52 +22,137 @@ EDGE_COLORS = {
 }
 
 def render_graph_viz(uri, user, password):
-    st.subheader("Visualização Espacial do Grafo")
+    st.subheader("Visualização Espacial do Grafo (Engine Nativa Neo4j)")
+    
+    # Buscamos os dados reais do banco
     query = "MATCH (n) OPTIONAL MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 100"
     data = database.run_cypher(uri, user, password, query)
     
     if not data:
         st.info("Banco de dados vazio ou desconectado.")
         return
+    
+    # Listas que vão alimentar a engine NVL
+    viz_nodes = []
+    viz_relationships = []
+    added_node_ids = set()
+    nodes_properties = {}  # Dicionário para armazenar propriedades dos nós
 
-    net = Network(height="360px", width="100%", bgcolor="#ffffff", font_color="#111111", notebook=False)
-    net.set_options("""
-    {
-      "edges": { "smooth": { "type": "continuous" }, "font": { "size": 10, "strokeWidth": 2 } },
-      "physics": { "barnesHut": { "gravitationalConstant": -25000, "centralGravity": 0.15, "springLength": 200, "springConstant": 0.05, "damping": 0.09, "avoidOverlap": 1 } },
-      "interaction": { "navigationButtons": true, "zoomView": true, "hover": true }
-    }
-    """)
-
-    added_nodes = set()
     for record in data:
+        # Processamento e extração de Nós (Origem 'n' e Destino 'm')
         for key in ["n", "m"]:
             node = record.get(key)
             if node:
                 n_id = node.get("id") if node.get("id") else (str(node.element_id) if hasattr(node, 'element_id') else str(node.id))
-                if n_id not in added_nodes:
+                
+                if n_id not in added_node_ids:
                     label_type = list(node.labels)[0] if node.labels else "Unknown"
-                    color = NODE_COLORS.get(label_type, "#9b59b6")
-                    props = "<br>".join([f"<b>{k}:</b> {v}" for k, v in dict(node).items()])
-                    net.add_node(n_id, label=str(n_id), title=f"<b>Tipo:</b> {label_type}<br>{props}", color=color, size=24)
-                    added_nodes.add(n_id)
                     
+                    # Copia as propriedades do nó e injeta o Tipo para exibição no tooltip
+                    props_dict = dict(node)
+                    props_dict["Entity_Type"] = label_type 
+                    
+                    # Armazena as propriedades para exibição ao clicar
+                    nodes_properties[str(n_id)] = props_dict
+                    
+                    # Criando o nó no formato oficial neo4j-viz (Sem o argumento incompatível 'labels')
+                    viz_nodes.append(
+                        VizNode(
+                            id=n_id,
+                            properties=props_dict,
+                            caption=str(n_id), # Texto central que aparece no nó
+                            color=NODE_COLORS.get(label_type, "#9b59b6"),
+                            size=15 if label_type == "Post" else 12 # Controle de escala dinâmico
+                        )
+                    )
+                    added_node_ids.add(n_id)
+                    
+        # Processamento e extração de Relacionamentos 'r'
         r = record.get("r")
         if r and record.get("n") and record.get("m"):
             o_id = record["n"].get("id") if record["n"].get("id") else str(record["n"].element_id)
             d_id = record["m"].get("id") if record["m"].get("id") else str(record["m"].element_id)
-            net.add_edge(o_id, d_id, title=r.type, label=r.type, color=EDGE_COLORS.get(r.type, "#7f8c8d"), width=2)
+            r_id = str(r.element_id) if hasattr(r, 'element_id') else str(r.id)
+            
+            # Criando a aresta no formato oficial neo4j-viz
+            viz_relationships.append(
+                VizRel(
+                    id=r_id,
+                    source=o_id,
+                    target=d_id,
+                    caption=r.type, # Texto que fica em cima da linha
+                    properties=dict(r) # Adiciona propriedades ao passar o mouse
+                )
+            )
 
     try:
-        net.save_graph("graph_cache.html")
-        with open("graph_cache.html", "r", encoding="utf-8") as f:
-            html = f.read()
-        custom_ui = """<div id="info-box" style="margin-top:12px; padding:15px; background-color:#f8f9fa; border-radius:6px; border: 1px solid #cccccc; color:#111111; font-family:sans-serif; min-height:60px; font-size:13px; line-height: 1.6;"><i>💡 Clique num nó para inspecionar os atributos...</i></div>"""
-        click_script = """<script type="text/javascript">network.on("click", function(properties) { var ids = properties.nodes; if(ids.length > 0) { var clickedNode = data.nodes.get(ids[0]); document.getElementById('info-box').innerHTML = "<h4 style='margin-top:0;color:#3498db;'>🔍 Propriedades</h4>" + clickedNode.title; } });</script>"""
-        b64_html = base64.b64encode((html.replace("</body>", f"{custom_ui}{click_script}</body>")) == html or (html.replace("</body>", f"{custom_ui}{click_script}</body>")).encode('utf-8')).decode('utf-8')
-        st.iframe(src=f"data:text/html;base64,{b64_html}", height=530)
+        # Construindo o Grafo de Visualização oficial da Neo4j
+        vg = VisualizationGraph(nodes=viz_nodes, relationships=viz_relationships)
+        
+        # Renderiza a estrutura gerando o componente HTML nativo
+        html_object = vg.render(width="100%", height="480px")
+        
+        # Armazena as propriedades em session_state para acesso posterior
+        st.session_state.nodes_properties = nodes_properties
+        
+        # JavaScript para detectar cliques nos nós e atualizar a seleção
+        html_with_click_handler = html_object.data + """
+        <script>
+        // Tenta encontrar o objeto network da vis.js (usado por neo4j-viz)
+        setTimeout(function() {
+            if (window.network) {
+                window.network.on("click", function(params) {
+                    if (params.nodes.length > 0) {
+                        const nodeId = params.nodes[0];
+                        // Atualiza a URL com o nó selecionado
+                        const url = new URL(window.location);
+                        url.searchParams.set('selected_node', encodeURIComponent(nodeId));
+                        window.history.replaceState({}, '', url);
+                        // Força um rerun do Streamlit
+                        window.location.href = url.toString();
+                    }
+                });
+            }
+        }, 1000);
+        </script>
+        """
+        
+        # Injeta o HTML retornado diretamente dentro do contêiner do Streamlit
+        components.html(html_with_click_handler, height=500)
+        
+        # Seção para exibir propriedades do nó
+        st.divider()
+        
+        # Verifica se há um nó selecionado via URL
+        query_params = st.query_params
+        selected_node = query_params.get("selected_node", None)
+        
+        if not selected_node and len(nodes_properties) > 0:
+            node_list = list(nodes_properties.keys())
+            selected_node = st.selectbox(
+                "Clique em um nó no grafo ou selecione aqui para ver suas propriedades:",
+                node_list,
+                key="selected_node_graph"
+            )
+        
+        if selected_node and selected_node in nodes_properties:
+            st.subheader(f"Propriedades de: {selected_node}")
+            props = nodes_properties[selected_node]
+            
+            # Exibe as propriedades em um formato organizado
+            cols_props = st.columns(2)
+            prop_items = sorted(props.items())
+            
+            for idx, (prop_name, prop_value) in enumerate(prop_items):
+                if prop_value is not None:
+                    col_idx = idx % 2
+                    with cols_props[col_idx]:
+                        st.write(f"**{prop_name}:** {prop_value}")
+        elif len(nodes_properties) > 0:
+            st.info("👆 Clique em um nó no grafo acima para ver suas propriedades")
+        
     except Exception as e:
-        st.error(f"Erro gráfico: {e}")
+        st.error(f"Erro ao instanciar a engine neo4j-viz: {e}")
 
 def render_node_form(uri, user, password):
     st.subheader("Criação de Nós")
