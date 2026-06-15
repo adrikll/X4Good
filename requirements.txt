@@ -1,6 +1,6 @@
-streamlit>=1.28.0
-neo4j>=5.0.0
-pyvis>=0.3.0
-neo4j-viz>=0.1.0
-python-dotenv>=1.0.0
-streamlit-agraph>=0.1.0
+streamlit
+neo4j
+pyvis
+neo4j-viz
+python-dotenv
+streamlit-agraph
