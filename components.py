@@ -21,6 +21,21 @@ EDGE_COLORS = {
     "MUTED": "#7f8c8d", "VIEWED": "#bdc3c7", "RECOMMENDED": "#1abc9c", "SIMILAR_TO": "#34495e"
 }
 
+# REGRA DE NEGÓCIO: Mapeamento de qual propriedade interna representa o rótulo visual do nó
+CAPTION_FIELDS = {
+    "User": "name",
+    "Post": "id",
+    "Media": "tipo",
+    "Comment": "conteudo",
+    "Community": "name",
+    "Hashtag": "name",
+    "Event": "name",
+    "Device": "tipo",
+    "Location": "name",
+    "Advertisement": "empresa",
+    "Topic": "name"
+}
+
 def render_graph_viz(uri, user, password):
     st.subheader("Visualização Espacial do Grafo (Engine Nativa Neo4j)")
     
@@ -32,11 +47,10 @@ def render_graph_viz(uri, user, password):
         st.info("Banco de dados vazio ou desconectado.")
         return
     
-    # Listas que vão alimentar a engine NVL
     viz_nodes = []
     viz_relationships = []
     added_node_ids = set()
-    nodes_properties = {}  # Dicionário para armazenar propriedades dos nós
+    nodes_properties = {}
 
     for record in data:
         # Processamento e extração de Nós (Origem 'n' e Destino 'm')
@@ -48,21 +62,27 @@ def render_graph_viz(uri, user, password):
                 if n_id not in added_node_ids:
                     label_type = list(node.labels)[0] if node.labels else "Unknown"
                     
-                    # Copia as propriedades do nó e injeta o Tipo para exibição no tooltip
                     props_dict = dict(node)
                     props_dict["Entity_Type"] = label_type 
                     
-                    # Armazena as propriedades para exibição ao clicar
                     nodes_properties[str(n_id)] = props_dict
                     
-                    # Criando o nó no formato oficial neo4j-viz (Sem o argumento incompatível 'labels')
+                    # 1. Identifica qual o campo alvo baseado na sua especificação
+                    target_property = CAPTION_FIELDS.get(label_type, "id")
+                    display_caption = props_dict.get(target_property, n_id)
+                    
+                    # 2. 🔥 SOLUÇÃO CORRETIVA: Força a propriedade 'name' no dicionário.
+                    # Isso engana a heurística da engine e a obriga a exibir o rótulo correto na tela.
+                    props_dict["name"] = str(display_caption)
+                    
+                    # Criando o nó com as propriedades injetadas e corrigidas
                     viz_nodes.append(
                         VizNode(
                             id=n_id,
                             properties=props_dict,
-                            caption=str(n_id), # Texto central que aparece no nó
+                            caption=str(display_caption), # Mantido por retrocompatibilidade
                             color=NODE_COLORS.get(label_type, "#9b59b6"),
-                            size=15 if label_type == "Post" else 12 # Controle de escala dinâmico
+                            size=15 if label_type == "Post" else 12 
                         )
                     )
                     added_node_ids.add(n_id)
@@ -74,41 +94,32 @@ def render_graph_viz(uri, user, password):
             d_id = record["m"].get("id") if record["m"].get("id") else str(record["m"].element_id)
             r_id = str(r.element_id) if hasattr(r, 'element_id') else str(r.id)
             
-            # Criando a aresta no formato oficial neo4j-viz
             viz_relationships.append(
                 VizRel(
                     id=r_id,
                     source=o_id,
                     target=d_id,
-                    caption=r.type, # Texto que fica em cima da linha
-                    properties=dict(r) # Adiciona propriedades ao passar o mouse
+                    caption=r.type,
+                    properties=dict(r)
                 )
             )
 
     try:
-        # Construindo o Grafo de Visualização oficial da Neo4j
         vg = VisualizationGraph(nodes=viz_nodes, relationships=viz_relationships)
-        
-        # Renderiza a estrutura gerando o componente HTML nativo
         html_object = vg.render(width="100%", height="480px")
         
-        # Armazena as propriedades em session_state para acesso posterior
         st.session_state.nodes_properties = nodes_properties
         
-        # JavaScript para detectar cliques nos nós e atualizar a seleção
         html_with_click_handler = html_object.data + """
         <script>
-        // Tenta encontrar o objeto network da vis.js (usado por neo4j-viz)
         setTimeout(function() {
             if (window.network) {
                 window.network.on("click", function(params) {
                     if (params.nodes.length > 0) {
                         const nodeId = params.nodes[0];
-                        // Atualiza a URL com o nó selecionado
                         const url = new URL(window.location);
                         url.searchParams.set('selected_node', encodeURIComponent(nodeId));
                         window.history.replaceState({}, '', url);
-                        // Força um rerun do Streamlit
                         window.location.href = url.toString();
                     }
                 });
@@ -117,13 +128,9 @@ def render_graph_viz(uri, user, password):
         </script>
         """
         
-        # Injeta o HTML retornado diretamente dentro do contêiner do Streamlit
         components.html(html_with_click_handler, height=500)
-        
-        # Seção para exibir propriedades do nó
         st.divider()
         
-        # Verifica se há um nó selecionado via URL
         query_params = st.query_params
         selected_node = query_params.get("selected_node", None)
         
@@ -139,7 +146,6 @@ def render_graph_viz(uri, user, password):
             st.subheader(f"Propriedades de: {selected_node}")
             props = nodes_properties[selected_node]
             
-            # Exibe as propriedades em um formato organizado
             cols_props = st.columns(2)
             prop_items = sorted(props.items())
             
@@ -163,7 +169,6 @@ def render_node_form(uri, user, password):
     current_time = now.strftime("%H:%M:%S")
 
     with st.container(border=True):
-        # --- FORMULÁRIO: USER ---
         if tipo_no == "User":
             u_id = st.text_input("ID do Usuário (user_id) * Obrigatório:")
             u_name = st.text_input("Nome (Opcional):")
@@ -181,7 +186,6 @@ def render_node_form(uri, user, password):
                     st.success(f"User {u_id} criado!"); st.rerun()
                 else: st.error("user_id é obrigatório!")
 
-        # --- FORMULÁRIO: POST ---
         elif tipo_no == "Post":
             p_id = st.text_input("ID do Post (post_id) * Obrigatório:")
             p_user = st.text_input("ID do Usuário Criador (user_id) * Obrigatório:")
@@ -198,7 +202,6 @@ def render_node_form(uri, user, password):
                     else: st.error("Erro! Certifique-se de que o user_id do autor existe no banco.")
                 else: st.error("Campos obrigatórios ausentes!")
 
-        # --- FORMULÁRIO: MEDIA ---
         elif tipo_no == "Media":
             m_id = st.text_input("ID da Mídia (id_media) * Obrigatório:")
             m_tipo = st.text_input("Tipo (Imagem, Vídeo...) * Obrigatório:")
@@ -215,7 +218,6 @@ def render_node_form(uri, user, password):
                     st.success("Mídia adicionada com sucesso!"); st.rerun()
                 else: st.error("Preencha todos os campos obrigatórios!")
 
-        # --- FORMULÁRIO: COMMENT ---
         elif tipo_no == "Comment":
             c_id = st.text_input("ID do Comentário (id_comment) * Obrigatório:")
             c_post = st.text_input("ID do Post Alvo (post_id) * Obrigatório:")
@@ -241,7 +243,6 @@ def render_node_form(uri, user, password):
                     else: st.error("Erro! Verifique se o user_id e o post_id já existem no banco.")
                 else: st.error("Campos obrigatórios ausentes!")
 
-        # --- FORMULÁRIO: COMMUNITY ---
         elif tipo_no == "Community":
             cm_id = st.text_input("ID da Comunidade (community_id) * Obrigatório:")
             cm_name = st.text_input("Nome da Comunidade * Obrigatório:")
@@ -266,7 +267,6 @@ def render_node_form(uri, user, password):
                     else: st.error("Erro! O user_id do criador precisa existir no banco.")
                 else: st.error("Campos obrigatórios em falta!")
 
-        # --- FORMULÁRIO: HASHTAG ---
         elif tipo_no == "Hashtag":
             h_id = st.text_input("ID da Hashtag (hashtag_id) * Obrigatório:", placeholder="ex: tag_tech")
             h_name = st.text_input("Nome da Tag (Sem o #) * Obrigatório:", placeholder="ex: TechForGood")
@@ -278,7 +278,6 @@ def render_node_form(uri, user, password):
                     st.success(f"Hashtag #{h_name} gravada!"); st.rerun()
                 else: st.error("Campos obrigatórios ausentes!")
 
-        # --- FORMULÁRIO: EVENT ---
         elif tipo_no == "Event":
             e_id = st.text_input("ID do Evento (event_id) * Obrigatório:")
             e_title = st.text_input("Título do Evento * Obrigatório:")
@@ -302,7 +301,6 @@ def render_node_form(uri, user, password):
                     else: st.error("Erro! O user_id do organizador precisa existir no banco.")
                 else: st.error("Preencha os campos obrigatórios!")
 
-        # --- FORMULÁRIO: DEVICE ---
         elif tipo_no == "Device":
             d_id = st.text_input("ID do Dispositivo (device_id) * Obrigatório:")
             d_model = st.text_input("Modelo do Dispositivo * Obrigatório:", placeholder="ex: iPhone 15 Pro")
@@ -316,7 +314,6 @@ def render_node_form(uri, user, password):
                     st.success("Dispositivo catalogado!"); st.rerun()
                 else: st.error("Campos obrigatórios ausentes!")
 
-        # --- FORMULÁRIO: LOCATION ---
         elif tipo_no == "Location":
             l_id = st.text_input("ID da Localização (location_id) * Obrigatório:")
             l_name = st.text_input("Nome Geográfico Completo * Obrigatório:", placeholder="ex: Fortaleza - Ceará")
@@ -331,7 +328,6 @@ def render_node_form(uri, user, password):
                     st.success("Coordenada geográfica mapeada!"); st.rerun()
                 else: st.error("Campos obrigatórios ausentes!")
 
-        # --- FORMULÁRIO: ADVERTISEMENT ---
         elif tipo_no == "Advertisement":
             ad_id = st.text_input("ID do Anúncio (adv_id) * Obrigatório:")
             ad_title = st.text_input("Título da Campanha Patrocinada * Obrigatório:")
@@ -346,7 +342,6 @@ def render_node_form(uri, user, password):
                     st.success("Anúncio patrocinado indexado!"); st.rerun()
                 else: st.error("Preencha todos os campos de campanha obrigatórios!")
 
-        # --- FALLBACK: TOPIC OU GENÉRICOS ---
         else:
             n_id = st.text_input(f"ID do(a) {tipo_no}:")
             n_name = st.text_input("Nome / Atributo Principal:")
