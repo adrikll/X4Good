@@ -161,7 +161,7 @@ def render_graph_viz(uri, user, password):
         st.error(f"Erro ao instanciar a engine neo4j-viz: {e}")
 
 def render_node_form(uri, user, password):
-    st.subheader("Criação de Nós")
+    st.subheader("Criação de Nós com Conexões Automáticas")
     tipo_no = st.selectbox("Selecione o Tipo de Entidade:", ["User", "Post", "Media", "Comment", "Community", "Hashtag", "Event", "Device", "Location", "Advertisement", "Topic"])
     
     now = datetime.now()
@@ -169,6 +169,7 @@ def render_node_form(uri, user, password):
     current_time = now.strftime("%H:%M:%S")
 
     with st.container(border=True):
+        # --- FORMULÁRIO: USER ---
         if tipo_no == "User":
             u_id = st.text_input("ID do Usuário (user_id) * Obrigatório:")
             u_name = st.text_input("Nome (Opcional):")
@@ -179,176 +180,191 @@ def render_node_form(uri, user, password):
             u_phone = st.text_input("Telefone (Opcional):")
             u_email = st.text_input("Email (Opcional):")
             
+            # Ajuste de Conexão: Localização do Usuário
+            u_loc_id = st.text_input("ID do Nó de Localização onde o Usuário reside (Opcional):", placeholder="ex: loc_01")
+            
             if st.button("Gravar Usuário", use_container_width=True):
                 if u_id.strip():
                     query = "MERGE (u:User {id: $id}) SET u.name=$name, u.country=$country, u.state=$state, u.city=$city, u.phone=$phone, u.email=$email RETURN u"
                     database.run_cypher(uri, user, password, query, {"id": u_id.strip(), "name": u_name.strip() or None, "country": u_country.strip() or None, "state": u_state.strip() or None, "city": u_city.strip() or None, "phone": u_phone.strip() or None, "email": u_email.strip() or None})
-                    st.success(f"User {u_id} criado!"); st.rerun()
+                    
+                    # Cria o vínculo LOCATED_IN se a localização foi informada
+                    if u_loc_id.strip():
+                        loc_query = "MATCH (u:User {id: $id}), (l:Location {id: $loc_id}) MERGE (u)-[:LOCATED_IN {timestamp: datetime()}]->(l)"
+                        database.run_cypher(uri, user, password, loc_query, {"id": u_id.strip(), "loc_id": u_loc_id.strip()})
+                    
+                    st.success(f"User {u_id} criado e indexado!"); st.rerun()
                 else: st.error("user_id é obrigatório!")
 
+        # --- FORMULÁRIO: POST ---
         elif tipo_no == "Post":
             p_id = st.text_input("ID do Post (post_id) * Obrigatório:")
             p_user = st.text_input("ID do Usuário Criador (user_id) * Obrigatório:")
             p_date = st.text_input("Data * Obrigatório:", value=current_date)
             p_time = st.text_input("Hora * Obrigatório:", value=current_time)
-            p_loc = st.text_input("Localização (Opcional):")
             p_desc = st.text_area("Descrição (Opcional):")
             
-            if st.button(" Gravar Post", use_container_width=True):
-                if p_id.strip() and p_user.strip() and p_date.strip() and p_time.strip():
-                    query = "MATCH (u:User {id: $user_id}) MERGE (p:Post {id: $id}) SET p.data=$date, p.hora=$time, p.localizacao=$loc, p.descricao=$desc MERGE (u)-[:POSTED {timestamp: datetime()}]->(p) RETURN p"
-                    res = database.run_cypher(uri, user, password, query, {"id": p_id.strip(), "user_id": p_user.strip(), "date": p_date.strip(), "time": p_time.strip(), "loc": p_loc.strip() or None, "desc": p_desc.strip() or None})
-                    if res: st.success("Post publicado e vinculado ao autor!"); st.rerun()
-                    else: st.error("Erro! Certifique-se de que o user_id do autor existe no banco.")
+            # Ajustes de Conexão solicitados: Localização, Tópico e Hashtag
+            p_loc_id = st.text_input("ID do Nó de Localização de onde publicou (Opcional):", placeholder="ex: loc_01")
+            p_topic_id = st.text_input("ID do Tópico do Post (Opcional):", placeholder="ex: top_01")
+            p_tag_id = st.text_input("ID da Hashtag do Post (Opcional):", placeholder="ex: tag_IA")
+            
+            if st.button(" Publicar Post", use_container_width=True):
+                if p_id.strip() and p_user.strip():
+                    # Cria o post e vincula ao autor original (POSTED)
+                    query = "MATCH (u:User {id: $user_id}) MERGE (p:Post {id: $id}) SET p.data=$date, p.hora=$time, p.descricao=$desc MERGE (u)-[:POSTED {timestamp: datetime()}]->(p) RETURN p"
+                    res = database.run_cypher(uri, user, password, query, {"id": p_id.strip(), "user_id": p_user.strip(), "date": p_date.strip(), "time": p_time.strip(), "desc": p_desc.strip() or None})
+                    
+                    if res:
+                        # Amarração automática: Localização do Post
+                        if p_loc_id.strip():
+                            database.run_cypher(uri, user, password, "MATCH (p:Post {id: $id}), (l:Location {id: $loc_id}) MERGE (p)-[:LOCATED_IN {timestamp: datetime()}]->(l)", {"id": p_id.strip(), "loc_id": p_loc_id.strip()})
+                        # Amarração automática: Tópico
+                        if p_topic_id.strip():
+                            database.run_cypher(uri, user, password, "MATCH (p:Post {id: $id}), (t:Topic {id: $t_id}) MERGE (p)-[:HAS_TOPIC]->(t)", {"id": p_id.strip(), "t_id": p_topic_id.strip()})
+                        # Amarração automática: Hashtag
+                        if p_tag_id.strip():
+                            database.run_cypher(uri, user, password, "MATCH (p:Post {id: $id}), (h:Hashtag {id: $h_id}) MERGE (p)-[:TAGGED_WITH]->(h)", {"id": p_id.strip(), "h_id": p_tag_id.strip()})
+                        
+                        st.success("Post publicado e conexões do ecossistema estabelecidas!"); st.rerun()
+                    else: st.error("Erro! O user_id do autor precisa existir no banco.")
                 else: st.error("Campos obrigatórios ausentes!")
 
+        # --- FORMULÁRIO: MEDIA ---
         elif tipo_no == "Media":
             m_id = st.text_input("ID da Mídia (id_media) * Obrigatório:")
-            m_tipo = st.text_input("Tipo (Imagem, Vídeo...) * Obrigatório:")
-            m_mime = st.text_input("MIME Type * Obrigatório:", placeholder="ex: image/png")
+            m_tipo = st.selectbox("Tipo de Mídia * Obrigatório:", ["Imagem", "Vídeo", "Áudio", "3D Asset"])
+            m_mime = st.text_input("MIME Type * Obrigatório:", value="image/png")
             m_bytes = st.number_input("Tamanho em Bytes * Obrigatório:", min_value=1, value=1024)
-            m_res = st.text_input("Resolução (Opcional):", placeholder="ex: 1080x1350")
-            m_dur = st.number_input("Duração em Segundos (Opcional):", min_value=0.0, value=0.0)
-            m_desc = st.text_area("Descrição (Opcional):")
+            
+            # Ajuste de Conexão: Associar ao Conteúdo de origem
+            m_post_id = st.text_input("ID do Post/Conteúdo dono desta mídia * Obrigatório:", placeholder="ex: post_01")
             
             if st.button("Gravar Mídia", use_container_width=True):
-                if m_id.strip() and m_tipo.strip() and m_mime.strip() and m_bytes > 0:
-                    query = "MERGE (m:Media {id: $id}) SET m.tipo=$tipo, m.mime_type=$mime, m.tam_bytes=$bytes, m.resolucao=$res, m.duracao_seg=$dur, m.descricao=$desc RETURN m"
-                    database.run_cypher(uri, user, password, query, {"id": m_id.strip(), "tipo": m_tipo.strip(), "mime": m_mime.strip(), "bytes": int(m_bytes), "res": m_res.strip() or None, "dur": float(m_dur) if m_dur > 0 else None, "desc": m_desc.strip() or None})
-                    st.success("Mídia adicionada com sucesso!"); st.rerun()
-                else: st.error("Preencha todos os campos obrigatórios!")
+                if m_id.strip() and m_post_id.strip():
+                    # Cria o nó de Mídia
+                    query = "MERGE (m:Media {id: $id}) SET m.tipo=$tipo, m.mime_type=$mime, m.tam_bytes=$bytes RETURN m"
+                    database.run_cypher(uri, user, password, query, {"id": m_id.strip(), "tipo": m_tipo, "mime": m_mime.strip(), "bytes": int(m_bytes)})
+                    
+                    # Cria o relacionamento HAS_MEDIA partindo do Post para a mídia
+                    rel_query = "MATCH (p:Post {id: $post_id}), (m:Media {id: $media_id}) MERGE (p)-[:HAS_MEDIA]->(m)"
+                    res_rel = database.run_cypher(uri, user, password, rel_query, {"post_id": m_post_id.strip(), "media_id": m_id.strip()})
+                    
+                    if res_rel is not None:
+                        st.success("Mídia criada e anexada ao conteúdo com sucesso!"); st.rerun()
+                    else: st.error("Erro! O ID do Post informado não foi encontrado.")
+                else: st.error("Preencha os IDs obrigatórios!")
 
-        elif tipo_no == "Comment":
-            c_id = st.text_input("ID do Comentário (id_comment) * Obrigatório:")
-            c_post = st.text_input("ID do Post Alvo (post_id) * Obrigatório:")
-            c_user = st.text_input("ID do Autor do Comentário (user_id) * Obrigatório:")
-            c_content = st.text_area("Conteúdo/Texto * Obrigatório:")
-            c_date = st.text_input("Data * Obrigatório:", value=current_date)
-            c_time = st.text_input("Hora * Obrigatório:", value=current_time)
-            c_likes = st.number_input("Número de Likes * Obrigatório:", min_value=0, value=0)
-            c_resp = st.number_input("Número de Respostas * Obrigatório:", min_value=0, value=0)
+        # --- FORMULÁRIO: DEVICE ---
+        elif tipo_no == "Device":
+            d_id = st.text_input("ID Único do Dispositivo (device_id) * Obrigatório:")
+            d_model = st.text_input("Modelo do Dispositivo * Obrigatório:", placeholder="ex: iPhone 15 Pro")
+            d_type = st.selectbox("Tipo de Dispositivo * Obrigatório:", ["Mobile", "Desktop", "Tablet", "Smart TV"])
             
-            if st.button("Gravar Comentário", use_container_width=True):
-                if c_id.strip() and c_post.strip() and c_user.strip() and c_content.strip():
-                    query = """
-                    MATCH (u:User {id: $user_id}), (p:Post {id: $post_id})
-                    MERGE (c:Comment {id: $id})
-                    SET c.conteudo=$content, c.data=$date, c.hora=$time, c.num_likes=$likes, c.num_respostas=$resp
-                    MERGE (u)-[:COMMENTS_ON {timestamp: datetime()}]->(c)
-                    MERGE (c)-[:BELONGS_TO]->(p)
-                    RETURN c
-                    """
-                    res = database.run_cypher(uri, user, password, query, {"id": c_id.strip(), "post_id": c_post.strip(), "user_id": c_user.strip(), "content": c_content.strip(), "date": c_date.strip(), "time": c_time.strip(), "likes": int(c_likes), "resp": int(c_resp)})
-                    if res: st.success("Comentário criado e acoplado no grafo!"); st.rerun()
-                    else: st.error("Erro! Verifique se o user_id e o post_id já existem no banco.")
+            # Ajustes de Conexão solicitados: Usuário Dono e Local de Acesso
+            d_user_id = st.text_input("ID do Usuário proprietário do dispositivo * Obrigatório:", placeholder="ex: adrik_ll")
+            d_loc_id = st.text_input("ID da Localização de onde este dispositivo acessa * Obrigatório:", placeholder="ex: loc_01")
+            
+            if st.button("⚡ Gravar e Vincular Dispositivo", use_container_width=True):
+                if d_id.strip() and d_user_id.strip() and d_loc_id.strip():
+                    # 1. Cria o dispositivo
+                    database.run_cypher(uri, user, password, "MERGE (d:Device {id: $id}) SET d.name=$model, d.tipo=$type", {"id": d_id.strip(), "model": d_model.strip(), "type": d_type})
+                    
+                    # 2. Conecta ao usuário (USES_DEVICE)
+                    res_u = database.run_cypher(uri, user, password, "MATCH (u:User {id: $u_id}), (d:Device {id: $d_id}) MERGE (u)-[:USES_DEVICE {since: datetime()}]->(d)", {"u_id": d_user_id.strip(), "d_id": d_id.strip()})
+                    
+                    # 3. Conecta o dispositivo ao local de acesso (LOCATED_IN)
+                    res_l = database.run_cypher(uri, user, password, "MATCH (d:Device {id: $d_id}), (l:Location {id: $loc_id}) MERGE (d)-[:LOCATED_IN {timestamp: datetime()}]->(l)", {"d_id": d_id.strip(), "loc_id": d_loc_id.strip()})
+                    
+                    if res_u and res_l:
+                        st.success("Dispositivo mapeado na rede e amarrado ao usuário e local!"); st.rerun()
+                    else: st.error("Erro! Verifique se o ID do Usuário e da Localização já existem no sistema.")
                 else: st.error("Campos obrigatórios ausentes!")
 
-        elif tipo_no == "Community":
-            cm_id = st.text_input("ID da Comunidade (community_id) * Obrigatório:")
-            cm_name = st.text_input("Nome da Comunidade * Obrigatório:")
-            cm_user = st.text_input("ID do Usuário Criador (user_id) * Obrigatório:")
-            cm_priv = st.selectbox("Privacidade * Obrigatório:", ["Público", "Privado"])
-            cm_date = st.text_input("Data de Criação * Obrigatório:", value=current_date)
-            cm_time = st.text_input("Hora de Criação * Obrigatório:", value=current_time)
-            cm_desc = st.text_area("Descrição (Opcional):")
-            cm_rules = st.text_area("Regras da Comunidade (Opcional):")
-            
-            if st.button("Gravar Comunidade", use_container_width=True):
-                if cm_id.strip() and cm_name.strip() and cm_user.strip():
-                    query = """
-                    MATCH (u:User {id: $user_id})
-                    MERGE (c:Community {id: $id})
-                    SET c.name=$name, c.privacidade=$priv, c.data_criacao=$date, c.hora_criacao=$time, c.descricao=$desc, c.regras=$rules
-                    MERGE (u)-[:MEMBER_OF {role: "admin", timestamp: datetime()}]->(c)
-                    RETURN c
-                    """
-                    res = database.run_cypher(uri, user, password, query, {"id": cm_id.strip(), "name": cm_name.strip(), "user_id": cm_user.strip(), "priv": cm_priv, "date": cm_date.strip(), "time": cm_time.strip(), "desc": cm_desc.strip() or None, "rules": cm_rules.strip() or None})
-                    if res: st.success(f"Comunidade '{cm_name}' criada e vinculada ao fundador!"); st.rerun()
-                    else: st.error("Erro! O user_id do criador precisa existir no banco.")
-                else: st.error("Campos obrigatórios em falta!")
-
-        elif tipo_no == "Hashtag":
-            h_id = st.text_input("ID da Hashtag (hashtag_id) * Obrigatório:", placeholder="ex: tag_tech")
-            h_name = st.text_input("Nome da Tag (Sem o #) * Obrigatório:", placeholder="ex: TechForGood")
-            
-            if st.button("Gravar Hashtag", use_container_width=True):
-                if h_id.strip() and h_name.strip():
-                    query = "MERGE (h:Hashtag {id: $id}) SET h.name = $name RETURN h"
-                    database.run_cypher(uri, user, password, query, {"id": h_id.strip(), "name": h_name.strip()})
-                    st.success(f"Hashtag #{h_name} gravada!"); st.rerun()
-                else: st.error("Campos obrigatórios ausentes!")
-
+        # --- FORMULÁRIO: EVENT ---
         elif tipo_no == "Event":
             e_id = st.text_input("ID do Evento (event_id) * Obrigatório:")
             e_title = st.text_input("Título do Evento * Obrigatório:")
             e_user = st.text_input("ID do Usuário Organizador (user_id) * Obrigatório:")
             e_date = st.text_input("Data do Evento * Obrigatório:", value=current_date)
             e_time = st.text_input("Hora do Evento * Obrigatório:", value=current_time)
-            e_link = st.text_input("Link de Acesso Virtual (Opcional):")
-            e_desc = st.text_area("Descrição (Opcional):")
+            
+            # Ajustes de Conexão solicitados: Localização e Tópico do Evento
+            e_loc_id = st.text_input("ID da Localização Física/Virtual do Evento (Opcional):", placeholder="ex: loc_01")
+            e_topic_id = st.text_input("ID do Tópico Temático do Evento (Opcional):", placeholder="ex: top_01")
             
             if st.button("Gravar Evento", use_container_width=True):
                 if e_id.strip() and e_title.strip() and e_user.strip():
-                    query = """
-                    MATCH (u:User {id: $user_id})
-                    MERGE (ev:Event {id: $id})
-                    SET ev.name=$title, ev.data=$date, ev.hora=$time, ev.link_acesso=$link, ev.descricao=$desc
-                    MERGE (u)-[:ORGANIZED {timestamp: datetime()}]->(ev)
-                    RETURN ev
-                    """
-                    res = database.run_cypher(uri, user, password, query, {"id": e_id.strip(), "title": e_title.strip(), "user_id": e_user.strip(), "date": e_date.strip(), "time": e_time.strip(), "link": e_link.strip() or None, "desc": e_desc.strip() or None})
-                    if res: st.success("Evento criado e vinculado ao organizador!"); st.rerun()
+                    query = "MATCH (u:User {id: $user_id}) MERGE (ev:Event {id: $id}) SET ev.name=$title, ev.data=$date, ev.hora=$time MERGE (u)-[:ORGANIZED {timestamp: datetime()}]->(ev) RETURN ev"
+                    res = database.run_cypher(uri, user, password, query, {"id": e_id.strip(), "title": e_title.strip(), "user_id": e_user.strip(), "date": e_date.strip(), "time": e_time.strip()})
+                    
+                    if res:
+                        if e_loc_id.strip():
+                            database.run_cypher(uri, user, password, "MATCH (ev:Event {id: $id}), (l:Location {id: $loc_id}) MERGE (ev)-[:LOCATED_IN]->(l)", {"id": e_id.strip(), "loc_id": e_loc_id.strip()})
+                        if e_topic_id.strip():
+                            database.run_cypher(uri, user, password, "MATCH (ev:Event {id: $id}), (t:Topic {id: $t_id}) MERGE (ev)-[:HAS_TOPIC]->(t)", {"id": e_id.strip(), "t_id": e_topic_id.strip()})
+                        st.success("Evento criado e integrado à malha geográfica!"); st.rerun()
                     else: st.error("Erro! O user_id do organizador precisa existir no banco.")
                 else: st.error("Preencha os campos obrigatórios!")
 
-        elif tipo_no == "Device":
-            d_id = st.text_input("ID do Dispositivo (device_id) * Obrigatório:")
-            d_model = st.text_input("Modelo do Dispositivo * Obrigatório:", placeholder="ex: iPhone 15 Pro")
-            d_type = st.selectbox("Tipo de Dispositivo * Obrigatório:", ["Mobile", "Desktop", "Tablet", "Smart TV"])
-            d_os = st.text_input("Sistema Operacional (Opcional):", placeholder="ex: iOS 17.4")
-            
-            if st.button("⚡ Gravar Dispositivo", use_container_width=True):
-                if d_id.strip() and d_model.strip():
-                    query = "MERGE (d:Device {id: $id}) SET d.name=$model, d.tipo=$type, d.sistema_operacional=$os RETURN d"
-                    database.run_cypher(uri, user, password, query, {"id": d_id.strip(), "model": d_model.strip(), "type": d_type, "os": d_os.strip() or None})
-                    st.success("Dispositivo catalogado!"); st.rerun()
-                else: st.error("Campos obrigatórios ausentes!")
-
-        elif tipo_no == "Location":
-            l_id = st.text_input("ID da Localização (location_id) * Obrigatório:")
-            l_name = st.text_input("Nome Geográfico Completo * Obrigatório:", placeholder="ex: Fortaleza - Ceará")
-            c1, c2 = st.columns(2)
-            with c1: l_lat = st.text_input("Latitude (Opcional):")
-            with c2: l_lon = st.text_input("Longitude (Opcional):")
-            
-            if st.button("Gravar Localização", use_container_width=True):
-                if l_id.strip() and l_name.strip():
-                    query = "MERGE (l:Location {id: $id}) SET l.name=$name, l.latitude=$lat, l.longitude=$lon RETURN l"
-                    database.run_cypher(uri, user, password, query, {"id": l_id.strip(), "name": l_name.strip(), "lat": l_lat.strip() or None, "lon": l_lon.strip() or None})
-                    st.success("Coordenada geográfica mapeada!"); st.rerun()
-                else: st.error("Campos obrigatórios ausentes!")
-
-        elif tipo_no == "Advertisement":
-            ad_id = st.text_input("ID do Anúncio (adv_id) * Obrigatório:")
-            ad_title = st.text_input("Título da Campanha Patrocinada * Obrigatório:")
-            ad_company = st.text_input("Empresa Anunciante * Obrigatório:")
-            ad_link = st.text_input("Link de Destino/Clique * Obrigatório:")
-            ad_desc = st.text_area("Descrição do Anúncio (Opcional):")
-            
-            if st.button("Gravar Anúncio", use_container_width=True):
-                if ad_id.strip() and ad_title.strip() and ad_company.strip() and ad_link.strip():
-                    query = "MERGE (a:Advertisement {id: $id}) SET a.name=$title, a.empresa=$company, a.link_destino=$link, a.descricao=$desc RETURN a"
-                    database.run_cypher(uri, user, password, query, {"id": ad_id.strip(), "title": ad_title.strip(), "company": ad_company.strip(), "link": ad_link.strip(), "desc": ad_desc.strip() or None})
-                    st.success("Anúncio patrocinado indexado!"); st.rerun()
-                else: st.error("Preencha todos os campos de campanha obrigatórios!")
-
+        # --- FALLBACK: DEMAIS NÓS (COMMENT, COMMUNITY, HASHTAG, LOCATION, ADVERTISEMENT, TOPIC) ---
         else:
-            n_id = st.text_input(f"ID do(a) {tipo_no}:")
-            n_name = st.text_input("Nome / Atributo Principal:")
-            if st.button(f"Gravar {tipo_no}", use_container_width=True):
-                if n_id and n_name:
-                    database.run_cypher(uri, user, password, f"MERGE (n:{tipo_no} {{id: $id}}) SET n.name = $name", {"id": n_id, "name": n_name})
-                    st.success(f"{tipo_no} gravado!"); st.rerun()
+            # Mantém os códigos originais simples para os nós que servem de destino primário
+            if tipo_no == "Comment":
+                c_id = st.text_input("ID do Comentário (id_comment) * Obrigatório:")
+                c_post = st.text_input("ID do Post Alvo (post_id) * Obrigatório:")
+                c_user = st.text_input("ID do Autor do Comentário (user_id) * Obrigatório:")
+                c_content = st.text_area("Conteúdo/Texto * Obrigatório:")
+                if st.button("Gravar Comentário", use_container_width=True):
+                    if c_id.strip() and c_post.strip() and c_user.strip() and c_content.strip():
+                        query = "MATCH (u:User {id: $user_id}), (p:Post {id: $post_id}) MERGE (c:Comment {id: $id}) SET c.conteudo=$content, c.data=$date, c.hora=$time MERGE (u)-[:COMMENTS_ON {timestamp: datetime()}]->(c) MERGE (c)-[:BELONGS_TO]->(p) RETURN c"
+                        res = database.run_cypher(uri, user, password, query, {"id": c_id.strip(), "post_id": c_post.strip(), "user_id": c_user.strip(), "content": c_content.strip(), "date": current_date, "time": current_time})
+                        if res: st.success("Comentário criado!"); st.rerun()
+                        else: st.error("Verifique os IDs informados.")
+            
+            elif tipo_no == "Community":
+                cm_id = st.text_input("ID da Comunidade (community_id) * Obrigatório:")
+                cm_name = st.text_input("Nome da Comunidade * Obrigatório:")
+                cm_user = st.text_input("ID do Usuário Criador (user_id) * Obrigatório:")
+                if st.button("Gravar Comunidade", use_container_width=True):
+                    if cm_id.strip() and cm_name.strip() and cm_user.strip():
+                        query = "MATCH (u:User {id: $user_id}) MERGE (c:Community {id: $id}) SET c.name=$name MERGE (u)-[:MEMBER_OF {role: 'admin', timestamp: datetime()}]->(c) RETURN c"
+                        res = database.run_cypher(uri, user, password, query, {"id": cm_id.strip(), "name": cm_name.strip(), "user_id": cm_user.strip()})
+                        if res: st.success("Comunidade criada!"); st.rerun()
+            
+            elif tipo_no == "Hashtag":
+                h_id = st.text_input("ID da Hashtag * Obrigatório:")
+                h_name = st.text_input("Nome (Sem #) * Obrigatório:")
+                if st.button("Gravar Hashtag", use_container_width=True):
+                    if h_id.strip() and h_name.strip():
+                        database.run_cypher(uri, user, password, "MERGE (h:Hashtag {id: $id}) SET h.name = $name", {"id": h_id.strip(), "name": h_name.strip()})
+                        st.success("Hashtag indexada!"); st.rerun()
+
+            elif tipo_no == "Location":
+                l_id = st.text_input("ID da Localização * Obrigatório:")
+                l_name = st.text_input("Nome Geográfico * Obrigatório:")
+                if st.button("Gravar Localização", use_container_width=True):
+                    if l_id.strip() and l_name.strip():
+                        database.run_cypher(uri, user, password, "MERGE (l:Location {id: $id}) SET l.name=$name", {"id": l_id.strip(), "name": l_name.strip()})
+                        st.success("Localização gravada!"); st.rerun()
+
+            elif tipo_no == "Advertisement":
+                ad_id = st.text_input("ID do Anúncio * Obrigatório:")
+                ad_title = st.text_input("Título * Obrigatório:")
+                ad_company = st.text_input("Empresa * Obrigatório:")
+                ad_link = st.text_input("Link * Obrigatório:")
+                if st.button("Gravar Anúncio", use_container_width=True):
+                    if ad_id.strip() and ad_title.strip():
+                        database.run_cypher(uri, user, password, "MERGE (a:Advertisement {id: $id}) SET a.name=$title, a.empresa=$company, a.link_destino=$link", {"id": ad_id.strip(), "title": ad_title.strip(), "company": ad_company.strip(), "link": ad_link.strip()})
+                        st.success("Campanha gravada!"); st.rerun()
+
+            else: # Topic ou Genéricos
+                n_id = st.text_input(f"ID do(a) {tipo_no}:")
+                n_name = st.text_input("Nome / Atributo Principal:")
+                if st.button(f"Gravar {tipo_no}", use_container_width=True):
+                    if n_id and n_name:
+                        database.run_cypher(uri, user, password, f"MERGE (n:{tipo_no} {{id: $id}}) SET n.name = $name", {"id": n_id, "name": n_name})
+                        st.success(f"{tipo_no} gravado!"); st.rerun()
 
 def render_relationship_form(uri, user, password):
     st.subheader("Conexão de Relacionamentos")
