@@ -7,7 +7,7 @@ O **X4Good Suite** é uma infraestrutura de gerenciamento e painel administrativ
 ##  Demonstração em Produção
 
 O painel de controle está implantado e pronto para uso através do link oficial:
- **[Acessar X4Good Admin Suite (Web App)](https://x4good.streamlit.app/)**
+ **[Acessar X4Good (Web App)](https://x4good.streamlit.app/)**
 
 ---
 
@@ -52,5 +52,13 @@ Algoritmos de recomendação baseados em topologia estrutural:
 
 ### 1. Clonar o Repositório
 ```bash
-git clone [https://github.com/seu-usuario/x4good-admin-suite.git](https://github.com/seu-usuario/x4good-admin-suite.git)
-cd x4good-admin-suite
+git clone https://github.com/adrikll/X4Good.git
+```
+### 2. Instalar dependências
+```bash
+pip install -r requirements.txt
+```
+### 3. Execução
+```bash
+streamlit run app.py
+```
