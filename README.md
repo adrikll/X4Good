@@ -1,25 +1,56 @@
-# 🌐 X4Good - Infraestrutura e Painel de Controle de Banco de Dados em Grafos
+# 🌐 X4Good Social Media - Administrator Suite
 
-Este repositório contém a implementação completa do banco de dados e da interface gráfica administrativa para a plataforma de mídia social de próxima geração **X4Good**. O ecossistema fornece um mecanismo rápido, visual e flexível para gerenciar bilhões de nós interconectados, além de contar com um console integrado para execução de scripts analíticos em Cypher.
-
-## Funcionalidades
-
-- **Inserção Expressa (GUI):** Formulários visuais dinâmicos para criar nós e conexões instantaneamente, sem precisar digitar código.
-- **Console Cypher Integrado:** Permite a execução direta de queries para fins de administração e desenvolvimento.
-- **Rastreabilidade Temporal e Contextual:** Todos os relacionamentos criados via interface adicionam propriedades de carimbo de data/hora (`timestamp`) e dados contextuais (`reaction`).
+O **X4Good Suite** é uma infraestrutura de gerenciamento e painel administrativo em tempo real para redes sociais baseadas em grafos. Desenvolvido com **Streamlit** e alimentado pelo **Neo4j Aura**, o ecossistema fornece uma interface visual altamente interativa para operações completas de CRUD (Criação, Leitura, Atualização e Deleção) sobre estruturas relacionais complexas, além de embutir motores nativos de Inteligência de Grafos para cálculo de similaridade e recomendação de conteúdo.
 
 ---
 
-## Requisitos e Preparação do Ambiente
+##  Demonstração em Produção
 
-### 1. Banco de Dados Neo4j
-Certifique-se de possuir uma instância do **Neo4j** (local via Neo4j Desktop, via Docker ou na nuvem pelo Neo4j Aura) ativa.
+O painel de controle está implantado e pronto para uso através do link oficial:
+ **[Acessar X4Good Admin Suite (Web App)](https://x4good.streamlit.app/)**
 
-Se preferir subir rapidamente via **Docker**, utilize o comando:
+---
+
+##  Visualização do Sistema
+
+Para documentar a interface, adicione os prints das telas nos marcadores abaixo:
+
+### 1. Painel de Autenticação e Visão Espacial do Grafo
+
+![Painel Superior - Visualização Espacial do Grafo de Ponta a Ponta](images/print.png)
+
+---
+
+##  Modelo de Dados (Schema do Grafo)
+
+O ecossistema modela uma plataforma de mídia social completa através de:
+
+- **11 Tipos de Nós (Rótulos):** `User`, `Post`, `Media`, `Comment`, `Community`, `Hashtag`, `Event`, `Device`, `Location`, `Advertisement`, `Topic`.
+- **Arestas Principais:** `FOLLOWS`, `FRIEND_OF`, `LIKES`, `SHARES`, `COMMENTS_ON`, `POSTED`, `MEMBER_OF`, `TAGGED_IN`, `BLOCKED`, `MUTED`, `VIEWED`, `SIMILAR_TO`, `HAS_MEDIA`, `LOCATED_IN`.
+
+---
+
+##  Motores Algorítmicos Embutidos
+
+O projeto possui scripts analíticos avançados para geração de inteligência sobre o grafo:
+
+###  Motor de Similaridade (`SIMILAR_TO`)
+Este motor calcula de forma cross-entidade o nível de afinidade entre elementos da rede, gerando novas arestas ponderadas por um `score_total` acumulado:
+- **Usuários:** Avalia curtidas mútuas, comunidades compartilhadas, sobreposição de seguidores/seguidos e tópicos em comum.
+- **Posts:** Avalia o compartilhamento de tópicos, concorrência de Hashtags e usuários engajados em comum.
+- **Mídias, Comentários e Anúncios:** Mapeia comportamentos de bots (textos idênticos), afinidade de marcas e resoluções técnicas equivalentes.
+
+###  Motor de Recomendação (`RECOMMENDED`)
+Algoritmos de recomendação baseados em topologia estrutural:
+- **Recomendação de Amigos:** Abordagem clássica de *Friend-of-a-Friend* (amigos em comum), recomendando usuários não conectados com validação de restrição de auto-vínculo.
+- **Recomendação de Comunidades:** Identifica os clusters onde seus amigos mais engajam, mas que você ainda não faz parte.
+- **Recomendação de Conteúdo (Posts, Eventos e Anúncios):** Filtros baseados em geolocalização residencial ou afinidade a tópicos específicos patrocinados por marcas.
+
+---
+
+##  Instalação e Execução Local
+
+### 1. Clonar o Repositório
 ```bash
-docker run \
-    --name neo4j-x4good \
-    -p 7474:7474 -p 7687:7687 \
-    -d \
-    -e NEO4J_AUTH=neo4j/sua_senha_aqui \
-    neo4j:latest
+git clone [https://github.com/seu-usuario/x4good-admin-suite.git](https://github.com/seu-usuario/x4good-admin-suite.git)
+cd x4good-admin-suite
