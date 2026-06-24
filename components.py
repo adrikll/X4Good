@@ -516,7 +516,7 @@ def render_relationship_form(uri, user, password):
             d_tipo = st.selectbox("Tipo Destino:", ["User", "Post", "Comment", "Community", "Topic", "Hashtag", "Event", "Device", "Location", "Media", "Advertisement"], key="r_dt")
             d_id = st.text_input("ID Destino:", key="r_did")
             
-        tipo_aresta = st.selectbox("Selecione o Vínculo Social:", ["FOLLOWS", "FRIEND_OF", "LIKES", "SHARES", "COMMENTS_ON", "POSTED", "MEMBER_OF", "TAGGED_IN", "BLOCKED", "MUTED", "VIEWED", "SIMILAR_TO"])
+        tipo_aresta = st.selectbox("Selecione o Vínculo Social:", ["FOLLOWS", "FRIEND_OF", "LIKES", "SHARES", "COMMENTS_ON", "POSTED", "MEMBER_OF", "TAGGED_IN", "BLOCKED", "MUTED", "VIEWED"])
         reacao = st.text_input("Atributo Contextual:", value="love")
         
         if st.button(" Conectar Entidades", use_container_width=True):
