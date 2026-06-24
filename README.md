@@ -1,6 +1,6 @@
-# 🌐 X4Good Social Media - Administrator Suite
+# X4Good Social Media - Administrator Suite
 
-O **X4Good Suite** é uma infraestrutura de gerenciamento e painel administrativo em tempo real para redes sociais baseadas em grafos. Desenvolvido com **Streamlit** e alimentado pelo **Neo4j Aura**, o ecossistema fornece uma interface visual altamente interativa para operações completas de CRUD (Criação, Leitura, Atualização e Deleção) sobre estruturas relacionais complexas, além de embutir motores nativos de Inteligência de Grafos para cálculo de similaridade e recomendação de conteúdo.
+O **X4Good Suite** é uma infraestrutura de gerenciamento e painel administrativo em tempo real para redes sociais baseadas em grafos. Desenvolvido com **Streamlit** e alimentado pelo **Neo4j Aura**, o ecossistema fornece uma interface visual interativa para operações completas de CRUD (Criação, Leitura, Atualização e Deleção) sobre estruturas relacionais complexas, além de embutir motores nativos de Inteligência de Grafos para cálculo de similaridade e recomendação de conteúdo.
 
 ---
 
@@ -43,7 +43,7 @@ O ecossistema modela uma plataforma de mídia social completa através de:
 
 ##  Implementações Inteligentes
 
-O projeto possui scripts analíticos avançados para geração de inteligência sobre o grafo:
+O projeto possui scripts analíticos para geração de inteligência sobre o grafo:
 
 ###  Similaridade (`SIMILAR_TO`)
 Calcula de forma cross-entidade o nível de afinidade entre elementos da rede, gerando novas arestas ponderadas por um `score_total` acumulado:
@@ -74,4 +74,4 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-### Obs: Para execução local e necessária as credenciais do banco na nuvem em .streamlit/secrets.toml
+### Obs: Para execução local é necessária as credenciais do banco na nuvem (em .streamlit/secrets.toml)

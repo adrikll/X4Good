@@ -1,6 +1,6 @@
 # Implementação de SIMILAR_TO para Usuários
 
-Calcula a similaridade entre usuários com base em interações e interesses em comum, consolidando os pesos em um score final.
+Calcula a similaridade entre usuários com base em interações e interesses em comum, integrando os pesos em um score final.
 
 ## 1. Curtidas em comum
 
@@ -76,7 +76,7 @@ WITH s,
      coalesce(s.score_conexoes, 0) AS cx,
      coalesce(s.score_topicos, 0) AS tp
 
-// Calcula a soma simples (ou você pode multiplicar por pesos se quiser dar mais relevância a um fator)
+// Calcula a soma simples
 SET s.score_total = c + cm + cx + tp;
 ```
 
@@ -234,7 +234,7 @@ MATCH (u:User)-[:COMMENTS_ON]->(c1:Comment)
 MATCH (u)-[:COMMENTS_ON]->(c2:Comment)
 WHERE c1.id < c2.id
 
-// Verifica se o texto é exatamente igual (comportamento de bot/spam)
+// Verifica se o texto é exatamente igual (bot/spam)
 WITH c1, c2, CASE WHEN c1.conteudo = c2.conteudo THEN 5 ELSE 1 END AS score_autor
 
 MERGE (c1)-[s:SIMILAR_TO]->(c2)
@@ -338,7 +338,7 @@ WITH s,
      coalesce(s.score_posts, 0) AS sp,
      coalesce(s.score_usuarios, 0) AS su
 
-// Multiplicamos por 2 o score de posts para dar mais relevância ao contexto direto
+// multiplicamos por 2 o score de posts para dar mais relevância
 SET s.score_total = (sp * 2) + su;
 ```
 
