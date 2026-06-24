@@ -4,7 +4,13 @@ import logging
 from neo4j import GraphDatabase
 import streamlit as st
 
-# Desabilitar logs verbosos do Neo4j driver
+"""
+Gerencia a conexão e a execução de queries no Neo4j.
+Possui um sistema automático de fallback para lidar com falhas de
+roteamento e protocolos diferentes entre conexões locais e na nuvem (Aura DB).
+"""
+
+#desabilita logs verbosos do Neo4j driver
 logging.getLogger('neo4j').setLevel(logging.WARNING)
 
 
@@ -12,7 +18,7 @@ def normalize_uri(uri: str) -> str:
     parsed = urlparse(uri)
     if not parsed.scheme:
         return f"bolt://{uri}"
-    # Se for Aura (neo4j+s), usar neo4j+ssc direto
+    #se for Aura (neo4j+s), usar neo4j+ssc direto
     if uri.startswith("neo4j+s://"):
         return uri.replace("neo4j+s://", "neo4j+ssc://", 1)
     return uri
@@ -62,7 +68,7 @@ def test_connection(uri, auth_user, auth_pass, silent=False):
             fallback_uri = get_fallback_uri(uri)
             if fallback_uri:
                 try:
-                    # Tenta criar driver com fallback diretamente sem cache
+                    #driver com fallback diretamente sem cache
                     driver = GraphDatabase.driver(
                         fallback_uri, 
                         auth=(auth_user, auth_pass),
@@ -94,7 +100,7 @@ def run_cypher(uri, user, password, query, parameters=None):
             fallback_uri = get_fallback_uri(uri)
             if fallback_uri:
                 try:
-                    # Tenta criar driver com fallback diretamente sem cache
+                    #driver com fallback diretamente sem cache
                     driver = GraphDatabase.driver(
                         fallback_uri, 
                         auth=(user, password),

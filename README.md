@@ -6,20 +6,31 @@ O **X4Good Suite** é uma infraestrutura de gerenciamento e painel administrativ
 
 ##  Demonstração em Produção
 
-O painel de controle está implantado e pronto para uso através do link oficial:
- **[Acessar X4Good (Web App)](https://x4good.streamlit.app/)**
+Link oficial do painel de controle:
+ **[x4good.streamlit.app](https://x4good.streamlit.app/)**
 
 ---
 
 ##  Visualização do Sistema
 
-Para documentar a interface, adicione os prints das telas nos marcadores abaixo:
+### 1. Visão Espacial do Grafo
 
-### 1. Painel de Autenticação e Visão Espacial do Grafo
+![Painel Superior - Visualização Espacial do Grafo de Ponta a Ponta](images/grafo.png)
 
-![Painel Superior - Visualização Espacial do Grafo de Ponta a Ponta](images/print.png)
+### 2. Criação de Nós
+
+![Painel Criação - Criação de nós e relacionamentos](images/criação.png)
+
+### 3. Deletar e editar
+
+![Painel de Deletar um nó/relacionamento ou editar um nó](images/delet_edit.png)
+
+### 3. Prompt Cypher
+
+![Promt para consultas cypher](images/prompt.png)
 
 ---
+
 
 ##  Modelo de Dados (Schema do Grafo)
 
@@ -30,17 +41,17 @@ O ecossistema modela uma plataforma de mídia social completa através de:
 
 ---
 
-##  Motores Algorítmicos Embutidos
+##  Implementações Inteligentes
 
 O projeto possui scripts analíticos avançados para geração de inteligência sobre o grafo:
 
-###  Motor de Similaridade (`SIMILAR_TO`)
-Este motor calcula de forma cross-entidade o nível de afinidade entre elementos da rede, gerando novas arestas ponderadas por um `score_total` acumulado:
+###  Similaridade (`SIMILAR_TO`)
+Calcula de forma cross-entidade o nível de afinidade entre elementos da rede, gerando novas arestas ponderadas por um `score_total` acumulado:
 - **Usuários:** Avalia curtidas mútuas, comunidades compartilhadas, sobreposição de seguidores/seguidos e tópicos em comum.
 - **Posts:** Avalia o compartilhamento de tópicos, concorrência de Hashtags e usuários engajados em comum.
 - **Mídias, Comentários e Anúncios:** Mapeia comportamentos de bots (textos idênticos), afinidade de marcas e resoluções técnicas equivalentes.
 
-###  Motor de Recomendação (`RECOMMENDED`)
+###  Recomendação (`RECOMMENDED`)
 Algoritmos de recomendação baseados em topologia estrutural:
 - **Recomendação de Amigos:** Abordagem clássica de *Friend-of-a-Friend* (amigos em comum), recomendando usuários não conectados com validação de restrição de auto-vínculo.
 - **Recomendação de Comunidades:** Identifica os clusters onde seus amigos mais engajam, mas que você ainda não faz parte.
@@ -62,3 +73,5 @@ pip install -r requirements.txt
 ```bash
 streamlit run app.py
 ```
+
+### Obs: Para execução local e necessária as credenciais do banco na nuvem em .streamlit/secrets.toml
