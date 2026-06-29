@@ -116,3 +116,55 @@ def run_cypher(uri, user, password, query, parameters=None):
                     return None
         st.error(f"Erro na execução da Query: {e}")
         return None
+    
+def check_db_health(uri, user, password):
+    """
+    Executa um Health Check detalhado no banco de dados.
+    Retorna um dicionário com o status ('online', 'paused', 'offline') e uma mensagem.
+    """
+    uri_normalizada = normalize_uri(uri)
+    is_aura = "neo4j.io" in uri_normalizada.lower()
+    
+    try:
+        #tenta criar o driver e verificar conectividade
+        driver = get_neo4j_driver(uri_normalizada, user, password)
+        driver.verify_connectivity()
+        return {"status": "online", "message": "Banco de dados ativo e operando normalmente!"}
+    except Exception as e:
+        error_msg = str(e)
+        
+        #se falhar, tenta o protocolo de fallback antes de dar o diagnóstico final
+        fallback_uri = get_fallback_uri(uri_normalizada)
+        if fallback_uri:
+            try:
+                driver_fb = GraphDatabase.driver(
+                    fallback_uri, 
+                    auth=(user, password),
+                    connection_timeout=5,
+                    connection_acquisition_timeout=5,
+                )
+                driver_fb.verify_connectivity()
+                driver_fb.close()
+                return {"status": "online", "message": "Conectado com sucesso via protocolo de Fallback."}
+            except Exception as fb_e:
+                error_msg += f" | Fallback Error: {str(fb_e)}"
+
+        #Análise do Erro para detecção de Instância Pausada no Neo4j Aura
+        error_msg_lower = error_msg.lower()
+        if is_aura and (
+            "unable to retrieve routing information" in error_msg_lower or 
+            "serviceunavailable" in error_msg_lower or 
+            "paused" in error_msg_lower or
+            "connection timed out" in error_msg_lower
+        ):
+            return {
+                "status": "paused",
+                "message": (
+                    " **Banco de Dados Pausado!** Neo4j Aura pausado devido a 3 dias de inatividade "
+                )
+            }
+            
+        return {
+            "status": "offline",
+            "message": f" **Falha de Conexão:** {error_msg}"
+        }

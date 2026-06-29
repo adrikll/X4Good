@@ -20,31 +20,52 @@ if "connected" not in st.session_state:
     st.session_state.connected = False
 
 try:
-    #conexão local/nuvem via secrets
     uri = st.secrets["NEO4J_URI"]
     user = st.secrets["NEO4J_USERNAME"]
     password = st.secrets["NEO4J_PASSWORD"]
     database_name = st.secrets["NEO4J_DATABASE"]
     usando_secrets = True
-
 except Exception as e:
-    st.write(e)
     usando_secrets = False
 
 st.sidebar.header("Autenticação Neo4j")
 
+#status do health check na Barra Lateral
+status_container = st.sidebar.empty()
+
 if usando_secrets:
-    st.sidebar.success("Banco de dados conectado!")
-    st.sidebar.info("Credenciais Neo4j Aura ativas.")
-    
-    #executa o teste de conexão automático
+    #teste de conexão automático usando o health check se ainda não estiver conectado
     if not st.session_state.connected:
         with st.spinner("Sincronizando com o Neo4j Aura..."):
-            if database.test_connection(uri, user, password, silent=True):
+            health = database.check_db_health(uri, user, password)
+            
+            if health["status"] == "online":
                 st.session_state.connected = True
+                st.sidebar.success("Banco de dados conectado!")
+                st.sidebar.info("Credenciais Neo4j Aura ativas.")
                 st.rerun()
+            elif health["status"] == "paused":
+                st.session_state.connected = False
+                
+                st.error(health["message"])
+                st.sidebar.warning("Status: Banco Pausado")
             else:
+                st.session_state.connected = False
                 st.sidebar.error("Falha ao autenticar com as credenciais dos Secrets.")
+                st.error(health["message"])
+    else:
+        st.sidebar.success("Banco de dados conectado!")
+        st.sidebar.info("Credenciais Neo4j Aura ativas.")
+        
+        if st.sidebar.button("Checar status do Banco"):
+            with st.spinner("Verificando integridade..."):
+                health = database.check_db_health(uri, user, password)
+                if health["status"] != "online":
+                    st.session_state.connected = False
+                    st.rerun()
+                else:
+                    st.toast("Banco operando!")
+
 else:
     st.sidebar.warning("Modo Local: Secrets não detectados.")
     uri = st.sidebar.text_input("URI de Conexão", value="bolt://localhost:7687")
@@ -52,17 +73,21 @@ else:
     password = st.sidebar.text_input("Senha", type="password", value="")
 
     if st.sidebar.button("Conectar ao Banco de Dados"):
-        if database.test_connection(uri, user, password, silent=False):
-            st.session_state.connected = True
-            st.sidebar.success("Conexão estabelecida localmente!")
-            st.rerun()
-        else:
-            st.session_state.connected = False
+        with st.spinner("Verificando conexão..."):
+            health = database.check_db_health(uri, user, password)
+            if health["status"] == "online":
+                st.session_state.connected = True
+                st.sidebar.success("Conexão estabelecida localmente!")
+                st.rerun()
+            else:
+                st.session_state.connected = False
+                st.error(health["message"])
 
 st.markdown("---")
 
+#Se não estiver conectado, impede a renderização dos componentes do grafo para não quebrar a aplicação
 if not st.session_state.connected:
-    st.info("Autentique as credenciais corretamente.")
+    st.info("Por favor, resolva as pendências de autenticação ou ative o seu banco de dados no console do Neo4j Aura.")
 else:
     
     #Visualização do Grafo
