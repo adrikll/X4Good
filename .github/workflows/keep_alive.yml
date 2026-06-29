@@ -1,0 +1,15 @@
+name: Keep Streamlit App Awake
+
+on:
+  schedule:
+    #executa todos os dias à meia-noite (00:00)
+    - cron: '0 0 * * *'
+  workflow_dispatch: #permite forçar a execução manualmente pelo botão no GitHub
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Streamlit Application
+        run: |
+          curl -sL -w "%{http_code}" https://x4good.streamlit.app -o /dev/null
