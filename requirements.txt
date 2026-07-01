@@ -4,3 +4,4 @@ pyvis
 neo4j-viz
 python-dotenv
 streamlit-agraph
+selenium

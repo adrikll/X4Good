@@ -2,14 +2,24 @@ name: Keep Streamlit App Awake
 
 on:
   schedule:
-    #executa todos os dias à meia-noite (00:00)
-    - cron: '0 0 * * *'
-  workflow_dispatch: #permite forçar a execução manualmente pelo botão no GitHub
+    - cron: '0 */4 * * *' #Executa a cada 4 horas 
+  workflow_dispatch: #Execução Manual
 
 jobs:
-  ping:
+  wake-up:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Streamlit Application
+      - name: Checkout Código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Instalar Dependências
         run: |
-          curl -sL -w "%{http_code}" https://x4good.streamlit.app -o /dev/null
+          pip install selenium webdriver-manager
+
+      - name: Executar Script de Wake Up
+        run: python wake_up.py
