@@ -23,19 +23,19 @@ Link oficial do painel de controle:
 
 ##  Visualização do Sistema
 
-### 1. Visão Espacial do Grafo
+### Visão Espacial do Grafo
 
 ![Painel Superior - Visualização Espacial do Grafo de Ponta a Ponta](images/grafo.png)
 
-### 2. Criação de Nós
+### Criação de Nós
 
 ![Painel Criação - Criação de nós e relacionamentos](images/criação.png)
 
-### 3. Deletar e editar
+### Deletar e editar
 
 ![Painel de Deletar um nó/relacionamento ou editar um nó](images/delet_edit.png)
 
-### 3. Prompt Cypher
+### Prompt Cypher
 
 ![Promt para consultas cypher](images/prompt.png)
 
@@ -69,19 +69,48 @@ Algoritmos de recomendação baseados em topologia estrutural:
 
 ---
 
-##  Instalação e Execução Local
+##  Como fazer seu próprio Administrador Suíte
 
-### 1. Clonar o Repositório
-```bash
-git clone https://github.com/adrikll/X4Good.git
+### 1. Configuração do Banco de Dados (Neo4j Aura)
+
+Acesse o Neo4j AuraDB e crie uma nova instância.
+Ao criar, baixe ou copie as credenciais fornecidas (URI, Username, Password, etc) e guarde-as.
+
+### 2. Configuração do Ambiente Local
+Na raiz do seu projeto, crie uma pasta oculta chamada .streamlit e dentro dela um arquivo chamado secrets.toml e coloque as credencias do banco:
+
 ```
-### 2. Instalar dependências
-```bash
+# .streamlit/secrets.toml
+NEO4J_URI = "uri"
+NEO4J_USERNAME = "username"
+NEO4J_PASSWORD = "password"
+NEO4J_DATABASE = "database_id"
+```
+### 3. Instalação de Dependências
+```
 pip install -r requirements.txt
 ```
-### 3. Execução
-```bash
+
+### 4. Executando o Projeto Localmente
+
+```
 streamlit run app.py
 ```
+### 5. Deploy (Streamlit Community Cloud)
+Suba o código atualizado do seu projeto para um repositório público ou privado no GitHub.
 
-### Obs: Para execução local é necessária as credenciais do banco na nuvem (em .streamlit/secrets.toml)
+Acesse o Streamlit Community Cloud, crie um novo app e conecte-o ao seu repositório.
+
+Adicione as credenciais do banco nas variáveis secretas do seu app:
+
+
+```
+# .streamlit/secrets.toml
+NEO4J_URI = "uri"
+NEO4J_USERNAME = "username"
+NEO4J_PASSWORD = "password"
+NEO4J_DATABASE = "database_id"
+```
+
+E pronto!
+
